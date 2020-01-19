@@ -189,10 +189,10 @@ class AlexNet():
                                       shape=[kernel_size[0], kernel_size[1], input_channels / groups, num_outputs],
                                       initializer=xavier_initializer_conv2d(),
                                       trainable=True)
-            # tf.add_to_collection(tf.GraphKeys.MODEL_VARIABLES, weights)
+            tf.add_to_collection(tf.GraphKeys.MODEL_VARIABLES, weights)
 
             biases = tf.get_variable('biases', shape=[num_outputs])
-            # tf.add_to_collection(tf.GraphKeys.MODEL_VARIABLES, biases)
+            tf.add_to_collection(tf.GraphKeys.MODEL_VARIABLES, biases)
 
         if groups == 1:
             # net = slim.conv2d(inputs, num_outputs=num_outputs, kernel_size=kernel_size, stride=stride, padding=padding,
