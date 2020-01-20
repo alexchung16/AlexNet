@@ -49,9 +49,6 @@ class AlexNet():
         self.raw_input_label = tf.placeholder(tf.float32, shape=[None, self.num_classes], name="class_label")
         self.is_training = tf.compat.v1.placeholder_with_default(input=False, shape=(), name='is_training')
 
-        if self.is_training is False:
-            self.keep_prob = 1.0
-
         self.global_step = tf.train.create_global_step()
         # self.global_step = tf.Variable(0, trainable=False, name="Global_Step")
         # self.epoch_step = tf.Variable(0, trainable=False, name="epoch_step")
@@ -111,9 +108,9 @@ class AlexNet():
                 # flatten and full connect layer
                 net = tf.reshape(net, shape=[-1, 6 * 6 * 256], name='flattened')
                 net = slim.fully_connected(net, num_outputs=4096, scope='fc6')
-                net = slim.dropout(net, keep_prob=keep_prob)
+                net = slim.dropout(net, keep_prob=keep_prob, is_training=is_training)
                 net = slim.fully_connected(net, num_outputs=4096, scope='fc7')
-                net = slim.dropout(net, keep_prob=keep_prob)
+                net = slim.dropout(net, keep_prob=keep_prob, is_training=is_training)
 
                 net = slim.fully_connected(net, num_outputs=num_classes, activation_fn=None, scope='fc8')
                 logits = slim.softmax(net, scope='logits')
