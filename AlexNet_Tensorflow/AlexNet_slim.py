@@ -15,7 +15,7 @@ import os
 import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
-from tensorflow.contrib.layers import xavier_initializer, xavier_initializer_conv2d
+from tensorflow.contrib.layers import xavier_initializer_conv2d
 
 
 class AlexNet():
@@ -48,6 +48,9 @@ class AlexNet():
         # y [None,num_classes]
         self.raw_input_label = tf.placeholder(tf.float32, shape=[None, self.num_classes], name="class_label")
         self.is_training = tf.compat.v1.placeholder_with_default(input=False, shape=(), name='is_training')
+
+        if self.is_training is False:
+            self.keep_prob = 1.0
 
         self.global_step = tf.train.create_global_step()
         # self.global_step = tf.Variable(0, trainable=False, name="Global_Step")
