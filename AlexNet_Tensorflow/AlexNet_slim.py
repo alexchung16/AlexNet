@@ -59,7 +59,7 @@ class AlexNet():
         self.loss = self.losses(labels=self.raw_input_label, logits=self.logits, name='loss')
         # train operation
         self.train = self.training(self.learning_rate, self.global_step)
-        self.accuracy = self.evaluate_batch(logits=self.logits, labels=self.raw_input_label) / self.batch_size
+        self.accuracy = self.accuracy(logits=self.logits, labels=self.raw_input_label)
 
     def inference(self, inputs, name):
         """
@@ -153,7 +153,7 @@ class AlexNet():
             cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=labels, name='entropy')
             return tf.reduce_mean(input_tensor=cross_entropy, name='loss')
 
-    def evaluate_batch(self, logits, labels):
+    def accuracy(self, logits, labels):
         """
         evaluate one batch correct num
         :param logits:
@@ -161,7 +161,8 @@ class AlexNet():
         :return:
         """
         correct_predict = tf.equal(tf.argmax(input=logits, axis=1), tf.argmax(input=labels, axis=1))
-        return tf.reduce_sum(tf.cast(correct_predict, dtype=tf.int32))
+
+        return tf.reduce_mean(tf.cast(correct_predict, dtype=tf.float32))
 
     def fill_feed_dict(self, image_feed, label_feed, is_training):
         feed_dict = {
