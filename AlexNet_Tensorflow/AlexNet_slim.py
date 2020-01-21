@@ -23,7 +23,7 @@ class AlexNet():
     VGG16 model
     """
     def __init__(self, input_shape, num_classes, batch_size, learning_rate=0.001, keep_prob=0.5, weight_decay=0.00005,
-                 is_pretrain=False,):
+                 is_pretrain=False):
         self.num_classes = num_classes
         self.batch_size = batch_size
 
