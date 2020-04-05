@@ -17,7 +17,7 @@ import tensorflow as tf
 from sklearn.preprocessing import LabelEncoder
 import cv2 as cv
 
-original_dataset_dir = '/home/alex/Documents/datasets/dogs_vs_cat_separate'
+original_dataset_dir = '/home/alex/Documents/dataset/dogs_vs_cat_separate'
 tfrecord_dir = os.path.join(original_dataset_dir, 'tfrecord')
 
 train_path = os.path.join(original_dataset_dir, 'train')

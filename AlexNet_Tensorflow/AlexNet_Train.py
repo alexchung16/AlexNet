@@ -111,19 +111,21 @@ if __name__ == "__main__":
                        weight_decay=FLAGS.weight_decay,
                        is_pretrain=FLAGS.is_pretrain)
 
-    train_images, train_labels, train_filenames = reader_tfrecord(record_file=FLAGS.train_data,
-                                                  batch_size=FLAGS.batch_size,
-                                                  input_shape=[FLAGS.height, FLAGS.width, FLAGS.depth],
-                                                  class_depth=FLAGS.num_classes,
-                                                  epoch=FLAGS.epoch,
-                                                  shuffle=True)
+    train_images, train_labels, train_filenames = dataset_tfrecord(record_file=FLAGS.train_data,
+                                                                   batch_size=FLAGS.batch_size,
+                                                                   input_shape=[FLAGS.height, FLAGS.width, FLAGS.depth],
+                                                                   class_depth=FLAGS.num_classes,
+                                                                   epoch=FLAGS.epoch,
+                                                                   shuffle=True,
+                                                                   is_training=True)
 
-    val_images, val_labels, val_filenames = reader_tfrecord(record_file=FLAGS.val_data,
+    val_images, val_labels, val_filenames = dataset_tfrecord(record_file=FLAGS.val_data,
                                                             batch_size=FLAGS.batch_size,
                                                             input_shape=[FLAGS.height, FLAGS.width, FLAGS.depth],
                                                             class_depth=FLAGS.num_classes,
                                                             epoch=FLAGS.epoch,
-                                                            shuffle=True)
+                                                            shuffle=True,
+                                                            is_training=False)
 
     init_op = tf.group(
         tf.global_variables_initializer(),
