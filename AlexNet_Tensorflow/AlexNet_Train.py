@@ -21,6 +21,16 @@ from DataProcess.read_TFRecord import reader_tfrecord, dataset_tfrecord, get_num
 from tensorflow.python.framework import graph_util
 
 
+# compatible GPU version problem
+from tensorflow.compat.v1 import ConfigProto
+from tensorflow.compat.v1 import InteractiveSession
+
+config = ConfigProto()
+config.gpu_options.allow_growth = True
+session = InteractiveSession(config=config)
+
+
+# config
 original_dataset_dir = '/home/alex/Documents/dataset/dogs_vs_cat_separate'
 tfrecord_dir = os.path.join(original_dataset_dir, 'tfrecord')
 
