@@ -14,7 +14,7 @@ import os
 import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
-from AlexNet_Tensorflow.AlexNet_slim import AlexNet
+from AlexNet_Tensorflow.nets.AlexNet_slim import AlexNet
 
 alexnet_model = '/home/alex/Documents/pretraing_model/alexnet/alexnet.npy'
 
