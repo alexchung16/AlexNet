@@ -12,16 +12,16 @@ import cv2 as cv
 import matplotlib.pyplot as plt
 import tensorflow.contrib.slim as slim
 from tensorflow.python_io import tf_record_iterator
+from tensorflow.python.ops import control_flow_ops
+from DataProcess.alexnet_preprocessing import preprocess_image
 
-# original_dataset_dir = '/home/alex/Documents/datasets/dogs_vs_cat_separate'
-original_dataset_dir = '/home/alex/Documents/dataset/dogs_vs_cat_separate'
-tfrecord_dir = os.path.join(original_dataset_dir, 'tfrecord')
+dataset_dir = '/home/alex/Documents/dataset/flower_tfrecord'
 
-train_path = os.path.join(original_dataset_dir, 'train')
-test_path = os.path.join(original_dataset_dir, 'test')
+train_data_path = os.path.join(dataset_dir, 'train')
+test_data_path = os.path.join(dataset_dir, 'val')
 
 
-def parse_example(serialized_sample, input_shape, class_depth, is_training=False):
+def parse_example(serialized_sample, target_shape, class_depth, is_training=False):
     """
     parse tensor
     :param image_sample:
@@ -57,62 +57,128 @@ def parse_example(serialized_sample, input_shape, class_depth, is_training=False
     # second step dataset operation
 
     # image augmentation
-    image = augmentation_image(input_image=image, image_shape=input_shape, is_training=is_training)
+    # image = augmentation_image(image=image, image_shape=input_shape, preprocessing_type=preprocessing_type,
+    #                            fast_mode=fast_mode, is_training=is_training,)
+    image = preprocess_image(image=image, output_height=target_shape[0], output_width=target_shape[1],
+                             is_training=is_training)
     # onehot label
     label = tf.one_hot(indices=label, depth=class_depth)
 
     return image, label, filename
 
 
-def augmentation_image(input_image, image_shape, flip_lr=False, flit_ud=False, brightness=False,
-                       bright_delta=0.2, contrast=False, contrast_lower=0.5, contrast_up=1.5, hue=False,
-                       hue_delta=0.2, saturation=False, saturation_low=0.5, saturation_up=1.5, standard=False,
-                       is_training = False):
-    try:
-        # resize image
-        resize_img = aspect_preserve_resize(input_image, resize_side_min=np.rint(image_shape[0] * 1.04),
-                                           resize_side_max=np.rint(image_shape[0] * 2.08), is_training=is_training)
-        # crop image
-        distort_img = image_crop(resize_img, image_shape[0], image_shape[1], is_training = is_training)
+def augmentation_image(image, image_shape, flip_lr=False, flip_ud=False, brightness=False,
+                       bright_delta=32. / 255., contrast=False, contrast_lower=0.5, contrast_up=1.5, hue=False,
+                       hue_delta=0.2, saturation=False, saturation_low=0.5, saturation_up=1.5, fast_mode=True,
+                       preprocessing_type='vgg', is_training = False,):
+    """
 
-        if is_training:
-            # enlarge image to same size
+    :param image:
+    :param image_shape:
+    :param flip_lr:
+    :param flip_ud:
+    :param brightness:
+    :param bright_delta:
+    :param contrast:
+    :param contrast_lower:
+    :param contrast_up:
+    :param hue:
+    :param hue_delta:
+    :param saturation:
+    :param saturation_low:
+    :param saturation_up:
+    :param fast_mode:
+    :param preprocessing_type: vgg | inception | cifar | lenet
+    :param is_training:
+    :return:
+    """
+    try:
+
+        if preprocessing_type == "vgg":
+            # resize image
+            # resize_img = aspect_preserve_resize(input_image, resize_side_min=np.rint(image_shape[0] * 1.04),
+            #                                    resize_side_max=np.rint(image_shape[0] * 2.08), is_training=is_training)
+            resize_img = aspect_preserve_resize(image, resize_side_min=256,
+                                                resize_side_max=288, is_training=is_training)
+
+            # crop image
+            distort_img = image_crop(resize_img, image_shape[0], image_shape[1], is_training = is_training)
+
+            if is_training:
+                # enlarge image to same size
 
                 # flip image in left and right
                 if flip_lr:
                     distort_img = tf.image.random_flip_left_right(image=distort_img, seed=0)
                 # flip image in left and right
-                if flit_ud:
+                if flip_ud:
                     distort_img = tf.image.random_flip_up_down(image=distort_img, seed=0)
-                # adjust image brightness
-                if brightness:
-                    distort_img = tf.image.random_brightness(image=distort_img, max_delta=bright_delta)
-                # # adjust image contrast
-                if contrast:
-                    distort_img = tf.image.random_contrast(image=distort_img, lower=contrast_lower, upper=contrast_up)
-                # adjust image hue
-                if hue:
-                    distort_img = tf.image.random_hue(image=distort_img, max_delta=hue_delta)
-                #  adjust image saturation
-                if saturation:
-                    distort_img = tf.image.random_saturation(image=distort_img, lower=saturation_low, upper=saturation_up)
 
-                # if standard:
-                #     distort_img = tf.image.per_image_standardization(image=distort_img)
+            return distort_img
 
-                return distort_img
+        elif preprocessing_type == "inception":
+            if image.dtype != tf.float32:
+                # convert image scale  to [0, 1]
+                image = tf.image.convert_image_dtype(image, dtype=tf.float32)
 
-        else:
+            if is_training:
+                # random crop image
+
+                # create bbox for crop image
+                bbox = tf.constant([0.0, 0.0, 1.0, 1.0], dtype=tf.float32, shape=[1, 1, 4])
+                # Each bounding box has shape [1, num_boxes, box coords] and
+                # the coordinates are ordered [ymin, xmin, ymax, xmax].
+                distort_img, distort_bbox = distorted_bounding_box_crop(image, bbox)
+
+                # reshape image
+                distort_img.set_shape([None, None, 3])
+
+                # resize image with random method
+                num_resize_cases = 1 if fast_mode else 4
+                distort_img = apply_with_random_selector(distort_img,
+                    lambda x, method: tf.image.resize_images(x, [image_shape[0], image_shape[0]], method),
+                    num_cases=num_resize_cases)
+
+                if fast_mode:
+                    # Randomly flip the image horizontally.
+                    distort_img = tf.image.random_flip_left_right(distort_img, seed=0)
+                else:
+                    if flip_lr:
+                        distort_img = tf.image.random_flip_left_right(image=distort_img, seed=0)
+                    # flip image in left and right
+                    if flip_ud:
+                        distort_img = tf.image.random_flip_up_down(image=distort_img, seed=0)
+                    # adjust image brightness
+                    if brightness:
+                        distort_img = tf.image.random_brightness(image=distort_img, max_delta=bright_delta)
+                    # # adjust image contrast
+                    if contrast:
+                        distort_img = tf.image.random_contrast(image=distort_img, lower=contrast_lower, upper=contrast_up)
+                    # adjust image hue
+                    if hue:
+                        distort_img = tf.image.random_hue(image=distort_img, max_delta=hue_delta)
+                    #  adjust image saturation
+                    if saturation:
+                        distort_img = tf.image.random_saturation(image=distort_img, lower=saturation_low,
+                                                                upper=saturation_up)
+            # eval preprocess
+            else:
+                image = tf.image.central_crop(image, central_fraction=0.875)
+
+                image = tf.expand_dims(image, 0)
+                image = tf.image.resize_bilinear(image, [image_shape[0], image_shape[1]], align_corners=False)
+                distort_img = tf.squeeze(image, [0])
+
             return distort_img
 
     except Exception as e:
         print('\nFailed augmentation for {0}'.format(e))
 
 
-
+#--------------------------------------for VGG preprocessing-----------------------------------------------
 def aspect_preserve_resize(image, resize_side_min=256, resize_side_max=512, is_training=False):
     """
-
+    rescale image size
     :param image_tensor:
     :param output_height:
     :param output_width:
@@ -133,8 +199,8 @@ def aspect_preserve_resize(image, resize_side_min=256, resize_side_max=512, is_t
                            true_fn=lambda : smaller_side / width,
                            false_fn=lambda : smaller_side / height)
 
-    new_height = tf.to_int32(tf.rint(height * resize_scale))
-    new_width = tf.to_int32(tf.rint(width * resize_scale))
+    new_height = tf.cast(tf.rint(height * resize_scale), dtype=tf.int32)
+    new_width = tf.cast(tf.rint(width * resize_scale), dtype=tf.int32)
 
     resize_image = tf.image.resize(image, size=(new_height, new_width))
 
@@ -159,6 +225,7 @@ def image_crop(image, output_height=224, output_width=224, is_training=False):
         crop_image = central_crop(image, output_height, output_width)
 
     return tf.cast(crop_image, image.dtype)
+
 
 def central_crop(image, crop_height=224, crop_width=224):
     """
@@ -197,7 +264,8 @@ def central_crop(image, crop_height=224, crop_width=224):
     return tf.reshape(crop_image, cropped_shape)
 
 
-def dataset_tfrecord(record_file, input_shape, class_depth, epoch=5, batch_size=10, shuffle=True, is_training=False):
+def dataset_tfrecord(record_file, target_shape, class_depth, epoch=5, batch_size=10, shuffle=True,
+                    preprocessing_type = 'vgg', fast_mode=True, is_training=False):
     """
     construct iterator to read image
     :param record_file:
@@ -220,7 +288,8 @@ def dataset_tfrecord(record_file, input_shape, class_depth, epoch=5, batch_size=
     # parse_img_dataset = raw_img_dataset.map(parse_example)
     # when parse_example has more than one parameter which used to process data
     parse_img_dataset = raw_img_dataset.map(lambda series_record:
-                                            parse_example(series_record, input_shape, class_depth, is_training=is_training))
+                                            parse_example(series_record, target_shape, class_depth,
+                                                          is_training=is_training))
     # get dataset batch
     if shuffle:
         shuffle_batch_dataset = parse_img_dataset.shuffle(buffer_size=batch_size*4).repeat(epoch).batch(batch_size=batch_size)
@@ -236,8 +305,8 @@ def dataset_tfrecord(record_file, input_shape, class_depth, epoch=5, batch_size=
     return image, label, filename
 
 
-def reader_tfrecord(record_file, input_shape, class_depth, batch_size=10, num_threads=2, epoch=5, shuffle=True,
-                    is_training=False):
+def reader_tfrecord(record_file, target_shape, class_depth, batch_size=10, num_threads=2, epoch=5, shuffle=True,
+                    preprocessing_type='vgg', fast_mode=True, is_training=False):
     """
     read and sparse TFRecord
     :param record_file:
@@ -258,7 +327,7 @@ def reader_tfrecord(record_file, input_shape, class_depth, batch_size=10, num_th
     _, serialized_sample = reader.read(filename_queue)
 
     # parse sample
-    image, label, filename = parse_example(serialized_sample, input_shape=input_shape, class_depth=class_depth,
+    image, label, filename = parse_example(serialized_sample, target_shape=target_shape, class_depth=class_depth,
                                            is_training=is_training)
 
     if shuffle:
@@ -298,9 +367,11 @@ def get_num_samples(record_dir):
     return num_samples
 
 if __name__ == "__main__":
-    record_file = os.path.join(tfrecord_dir, 'train')
-    image_batch, label_batch, filename = dataset_tfrecord(record_file=record_file, input_shape=[224, 224, 3],
+    num_samples = get_num_samples(train_data_path)
+    print('all sample size is {0}'.format(num_samples))
+    image_batch, label_batch, filename = dataset_tfrecord(record_file=train_data_path, target_shape=[227, 227, 3],
                                                           class_depth=5, is_training=True)
+
     # create local and global variables initializer group
     init_op = tf.group(
         tf.global_variables_initializer(),
@@ -309,8 +380,6 @@ if __name__ == "__main__":
     with tf.Session() as sess:
         sess.run(init_op)
 
-        num_samples = get_num_samples(record_file)
-        print('all sample size is {0}'.format(num_samples))
         # create Coordinator to manage the life period of multiple thread
         coord = tf.train.Coordinator()
         # Starts all queue runners collected in the graph to execute input queue operation
@@ -320,7 +389,7 @@ if __name__ == "__main__":
         try:
             if not coord.should_stop():
                 image_feed, label_feed = sess.run([image_batch, label_batch])
-                plt.imshow(image_feed[0])
+                plt.imshow(np.uint8(image_feed[0][:,:,::-1]))
                 plt.show()
         except Exception as e:
             print(e)
