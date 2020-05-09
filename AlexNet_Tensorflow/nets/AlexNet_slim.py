@@ -17,33 +17,25 @@ import tensorflow as tf
 import tensorflow.contrib.slim as slim
 from tensorflow.contrib.layers import xavier_initializer_conv2d
 
+_R_MEAN = 123.68
+_G_MEAN = 116.779
+_B_MEAN = 103.939
 
 class AlexNet():
     """
     VGG16 model
     """
-    def __init__(self, input_shape, num_classes, batch_size, learning_rate=0.001, keep_prob=0.5, weight_decay=0.00005,
-                 is_pretrain=False):
+    def __init__(self, input_shape, num_classes, batch_size, learning_rate=0.001, keep_prob=0.5, weight_decay=0.00005):
         self.num_classes = num_classes
         self.batch_size = batch_size
 
         self.learning_rate = learning_rate
-        # self.optimizer = optimizer
         self.keep_prob = keep_prob
         self.weight_decay = weight_decay
 
-        # self._R_MEAN = 123.68
-        # self._G_MEAN = 116.779
-        # self._B_MEAN = 103.939
-
-        self.is_pretrain = is_pretrain
-        # self.initializer = tf.random_normal_initializer(stddev=0.1)
-        # add placeholder (X,label)
         self.raw_input_data = tf.placeholder(tf.float32, shape=[None, input_shape[0], input_shape[1], input_shape[2]],
                                              name="input_images")
-        # self.raw_input_data = self.mean_subtraction(self.raw_input_data, means=[self._R_MEAN,
-        #                                                                         self._G_MEAN,
-        #                                                                         self._B_MEAN])
+        # self.raw_input_data = self.mean_subtraction(self.raw_input_data, means=[_R_MEAN, _G_MEAN, _B_MEAN])
         # self.raw_input_data = self.convert_rgb_to_bgr(self.raw_input_data)
         # y [None,num_classes]
         self.raw_input_label = tf.placeholder(tf.float32, shape=[None, self.num_classes], name="class_label")
@@ -130,7 +122,7 @@ class AlexNet():
         # define trainable variable
         trainable_scope = ['alexnet/fc6', 'alexnet/fc7', 'alexnet/fc8']
         trainable_variable = []
-        if self.is_pretrain and trainable_scope:
+        if trainable_scope is not None:
             for scope in trainable_scope:
                 variables = tf.model_variables(scope=scope)
                 trainable_variable.extend([var for var in variables])
@@ -138,7 +130,7 @@ class AlexNet():
         # according to use request of slim.batch_norm
         # update moving_mean and moving_variance when training
         train_op = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss=self.loss,
-                                                                             global_step=self.global_step)
+                                                                             global_step=global_step)
         return train_op
 
     def losses(self, logits, labels, name):
@@ -217,7 +209,7 @@ class AlexNet():
 
         return net
 
-    def load_pretrain_model(self, sess, model_path, custom_scope=['fc8']):
+    def load_pretrain_model(self, sess, model_path, custom_scope=None):
         """
 
         :param sess:
@@ -226,6 +218,9 @@ class AlexNet():
         """
         weights_dict = np.load(model_path, encoding='bytes', allow_pickle=True).item()
         weights_dict = dict(weights_dict)
+
+        if custom_scope is None:
+            custom_scope = ['fc8']
 
         for op_name in weights_dict:
             if op_name not in custom_scope:
