@@ -32,19 +32,19 @@ class AlexNet():
         self.keep_prob = keep_prob
         self.weight_decay = weight_decay
 
-        self._R_MEAN = 123.68
-        self._G_MEAN = 116.779
-        self._B_MEAN = 103.939
+        # self._R_MEAN = 123.68
+        # self._G_MEAN = 116.779
+        # self._B_MEAN = 103.939
 
         self.is_pretrain = is_pretrain
         # self.initializer = tf.random_normal_initializer(stddev=0.1)
         # add placeholder (X,label)
         self.raw_input_data = tf.placeholder(tf.float32, shape=[None, input_shape[0], input_shape[1], input_shape[2]],
                                              name="input_images")
-        self.raw_input_data = self.mean_subtraction(self.raw_input_data, means=[self._R_MEAN,
-                                                                                self._G_MEAN,
-                                                                                self._B_MEAN])
-        self.raw_input_data = self.convert_rgb_to_bgr(self.raw_input_data)
+        # self.raw_input_data = self.mean_subtraction(self.raw_input_data, means=[self._R_MEAN,
+        #                                                                         self._G_MEAN,
+        #                                                                         self._B_MEAN])
+        # self.raw_input_data = self.convert_rgb_to_bgr(self.raw_input_data)
         # y [None,num_classes]
         self.raw_input_label = tf.placeholder(tf.float32, shape=[None, self.num_classes], name="class_label")
         self.is_training = tf.compat.v1.placeholder_with_default(input=False, shape=(), name='is_training')
@@ -106,7 +106,8 @@ class AlexNet():
                 net = slim.max_pool2d(net, [3, 3], 2, scope='pool5')
 
                 # flatten and full connect layer
-                net = tf.reshape(net, shape=[-1, 6 * 6 * 256], name='flattened')
+                # net = tf.reshape(net, shape=[-1, 6 * 6 * 256], name='flattened')
+                net = slim.flatten(net, scope='flattened')
                 net = slim.fully_connected(net, num_outputs=4096, scope='fc6')
                 net = slim.dropout(net, keep_prob=keep_prob, is_training=is_training)
                 net = slim.fully_connected(net, num_outputs=4096, scope='fc7')
@@ -117,7 +118,7 @@ class AlexNet():
 
                 return logits
 
-    def training(self, learnRate, globalStep):
+    def training(self, learning_rate, global_step):
         """
         train operation
         :param learnRate:
@@ -125,21 +126,19 @@ class AlexNet():
         :param args:
         :return:
         """
+        # frozen layer
         # define trainable variable
-        trainable_variable = None
-        # trainable_scope = self.trainable_scope
-        # trainable_scope = ['vgg_16/fc6', 'vgg_16/fc7', 'vgg_16/fc8_1', 'vgg_16/fc8_2']
-        trainable_scope = []
+        trainable_scope = ['alexnet/fc6', 'alexnet/fc7', 'alexnet/fc8']
+        trainable_variable = []
         if self.is_pretrain and trainable_scope:
-            trainable_variable = []
             for scope in trainable_scope:
                 variables = tf.model_variables(scope=scope)
-                [trainable_variable.append(var) for var in variables]
+                trainable_variable.extend([var for var in variables])
 
         # according to use request of slim.batch_norm
         # update moving_mean and moving_variance when training
-        train_op = tf.train.AdamOptimizer(learnRate).minimize(self.loss, global_step=globalStep,
-                                                              var_list=trainable_variable)
+        train_op = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss=self.loss,
+                                                                             global_step=self.global_step)
         return train_op
 
     def losses(self, logits, labels, name):
@@ -218,7 +217,7 @@ class AlexNet():
 
         return net
 
-    def load_pretrain_model(self, sess, model_path):
+    def load_pretrain_model(self, sess, model_path, custom_scope=['fc8']):
         """
 
         :param sess:
@@ -227,8 +226,6 @@ class AlexNet():
         """
         weights_dict = np.load(model_path, encoding='bytes', allow_pickle=True).item()
         weights_dict = dict(weights_dict)
-
-        custom_scope = ['fc8']
 
         for op_name in weights_dict:
             if op_name not in custom_scope:
@@ -243,6 +240,7 @@ class AlexNet():
                             var = tf.get_variable('weights', trainable=True)
                             sess.run(var.assign(data))
         print('+++++++++++++++++++Successful load all variable+++++++++++++++++++')
+
 
     def alexnet_arg_scope(self, weight_decay=0.0005):
         with slim.arg_scope([slim.conv2d, slim.fully_connected],
