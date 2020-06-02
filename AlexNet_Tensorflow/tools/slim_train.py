@@ -72,7 +72,7 @@ if __name__ == "__main__":
                        keep_prob=FLAGS.keep_prop,
                        weight_decay=FLAGS.weight_decay)
 
-    train_images_batch, train_labels_batch, train_filenames = dataset_tfrecord(record_file=FLAGS.train_data,
+    train_images_batch, train_labels_batch, train_filenames = dataset_tfrecord(record_files=FLAGS.train_data,
                                                                    batch_size=FLAGS.batch_size,
                                                                    target_shape=[FLAGS.height, FLAGS.width, FLAGS.depth],
                                                                    class_depth=FLAGS.num_classes,
@@ -80,7 +80,7 @@ if __name__ == "__main__":
                                                                    shuffle=True,
                                                                    is_training=True)
 
-    val_images_batch, val_labels_batch, val_filenames = dataset_tfrecord(record_file=FLAGS.val_data,
+    val_images_batch, val_labels_batch, val_filenames = dataset_tfrecord(record_files=FLAGS.val_data,
                                                             batch_size=FLAGS.batch_size,
                                                             target_shape=[FLAGS.height, FLAGS.width, FLAGS.depth],
                                                             class_depth=FLAGS.num_classes,
